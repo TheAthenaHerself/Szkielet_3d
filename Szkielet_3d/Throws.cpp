@@ -2,8 +2,8 @@
 #include <d3d12.h>
 #include "Throws.h"
 
-void ThrowIfFailed(HRESULT error_code) {
-	if (error_code != S_OK) {
-		throw std::runtime_error("Failed to create factory.");
+void ThrowIfFailed(HRESULT error_code, std::string error) {
+	if (FAILED(error_code)) {
+		throw std::runtime_error("Fail at" + error);
 	}
 }

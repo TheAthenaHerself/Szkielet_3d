@@ -1,5 +1,7 @@
 #include <windows.h>
 #include <winuser.h>
+#include <stdexcept>
+#include <iostream>
 #include "Direct3d.h"
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -62,26 +64,35 @@ int WINAPI wWinMain(
 }
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-    switch (uMsg)
-    {
-    case WM_CREATE:
-        initD2(hwnd);
-        InitTimer(hwnd);
-        return 0;
-    case WM_TIMER:
-        OnTimer();
-        InvalidateRect(hwnd, nullptr, FALSE);
-        return 0;
-    case WM_PAINT:
-        paintD2(hwnd);
-        ValidateRect(hwnd, nullptr);
-        return 0;
-    case WM_DESTROY:
-        destroyD2();
-        PostQuitMessage(0);
-        DestroyWindow(hwnd);
-        ReleaseTimer(hwnd);
-        return 0;
+    try {
+        switch (uMsg)
+        {
+        case WM_CREATE:
+            OnInit(hwnd);
+            InitTimer(hwnd);
+            return 0;
+        case WM_TIMER:
+            OnUpdate();
+            InvalidateRect(hwnd, nullptr, FALSE);
+            return 0;
+        case WM_PAINT:
+            OnRender();
+            ValidateRect(hwnd, nullptr);
+            return 0;
+        case WM_DESTROY:
+            OnDestroy();
+            PostQuitMessage(0);
+            DestroyWindow(hwnd);
+            ReleaseTimer(hwnd);
+            return 0;
+        }
+    }
+    catch (std::runtime_error error) {
+        std::string str(error.what());
+        str = "\n" + str + "\n";
+        std::wstring wsTmp(str.begin(), str.end());
+        OutputDebugStringW(wsTmp.c_str());
+        exit(1);
     }
     return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
