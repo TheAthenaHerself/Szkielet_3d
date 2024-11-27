@@ -12,6 +12,21 @@ using Microsoft::WRL::ComPtr;
 namespace {
 	static const UINT FrameCount = 2;
 
+	struct vertex_t {
+		FLOAT position[3];
+		FLOAT color[4];
+	};
+
+	size_t const VERTEX_SIZE = sizeof(vertex_t) / sizeof(FLOAT);
+	vertex_t triangle_data[] = {
+	  { 0.0f, 1.0f, 0.5f,         0.0f, 1.0f, 0.0f, 1.0f },
+	  { 1.0f, 0.0f, 0.5f,         1.0f, 0.0f, 0.0f, 1.0f },
+	  { -1.0f, -1.0f, 0.5f,       0.0f, 0.0f, 1.0f, 1.0f }
+	};
+	size_t const VERTEX_BUFFER_SIZE = sizeof(triangle_data);
+	size_t const NUM_VERTICES = VERTEX_BUFFER_SIZE / sizeof(vertex_t);
+
+
 	ComPtr<IDXGISwapChain3> m_swapChain;
 	ComPtr<ID3D12Device> m_device;
 	ComPtr<ID3D12Resource> m_renderTargets[FrameCount];
@@ -20,6 +35,12 @@ namespace {
 	ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
 	ComPtr<ID3D12GraphicsCommandList> m_commandList;
 	UINT m_rtvDescriptorSize;
+
+	ComPtr<ID3D12RootSignature> m_rootSignature;
+	ComPtr<ID3D12PipelineState> m_pipelineState;
+
+	ComPtr<ID3D12Resource> m_vertexBuffer;
+	D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
 
 	UINT_PTR timer;
 
@@ -142,10 +163,120 @@ namespace {
 	}
 	
 	void LoadAssets() {
+		D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {
+			.NumParameters = 0,
+			.pParameters = nullptr,
+			.NumStaticSamplers = 0,
+			.pStaticSamplers = nullptr,
+			.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
+		};
+
+		ComPtr<ID3DBlob> signature;
+		ComPtr<ID3DBlob> error;
+		ThrowIfFailed(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error), "serialize root signature");
+		ThrowIfFailed(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)), "create root signature");
+
+		D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
+			{
+			  .SemanticName = "POSITION",
+			  .SemanticIndex = 0,
+			  .Format = DXGI_FORMAT_R32G32B32_FLOAT,
+			  .InputSlot = 0,
+			  .AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT,
+			  .InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+			  .InstanceDataStepRate = 0
+			},
+			{
+			  .SemanticName = "COLOR",
+			  .SemanticIndex = 0,
+			  .Format = DXGI_FORMAT_R32G32B32A32_FLOAT,
+			  .InputSlot = 0,
+			  .AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT,
+			  .InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+			  .InstanceDataStepRate = 0
+			}
+		};
+
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {
+			.pRootSignature = m_rootSignature.Get(),
+			.VS = { vs_main, sizeof(vs_main) }, // bytecode vs w tablicy vs_main
+			.PS = { ps_main, sizeof(ps_main) }, // bytecode ps w tablicy ps_main
+			.BlendState = {
+				.AlphaToCoverageEnable = FALSE,
+				.IndependentBlendEnable = FALSE,
+				.RenderTarget = {
+				  {
+				   .BlendEnable = FALSE,
+				   .LogicOpEnable = FALSE,
+				   .SrcBlend = D3D12_BLEND_ONE,
+				   .DestBlend = D3D12_BLEND_ZERO,
+				   .BlendOp = D3D12_BLEND_OP_ADD,
+				   .SrcBlendAlpha = D3D12_BLEND_ONE,
+				   .DestBlendAlpha = D3D12_BLEND_ZERO,
+				   .BlendOpAlpha = D3D12_BLEND_OP_ADD,
+				   .LogicOp = D3D12_LOGIC_OP_NOOP,
+				   .RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL
+				  }
+				 }
+			},
+			.SampleMask = UINT_MAX,
+			.RasterizerState = {
+				.FillMode = D3D12_FILL_MODE_SOLID,
+				.CullMode = D3D12_CULL_MODE_BACK,
+				.FrontCounterClockwise = FALSE,
+				.DepthBias = D3D12_DEFAULT_DEPTH_BIAS,
+				.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP,
+				.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS,
+				.DepthClipEnable = TRUE,
+				.MultisampleEnable = FALSE,
+				.AntialiasedLineEnable = FALSE,
+				.ForcedSampleCount = 0,
+				.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF
+			},
+			.InputLayout = { inputElementDescs, _countof(inputElementDescs) },
+			.IBStripCutValue = D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED,
+			.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
+			.NumRenderTargets = 1,
+			.RTVFormats = { DXGI_FORMAT_R8G8B8A8_UNORM },
+			.SampleDesc = {.Count = 1, .Quality = 0 }
+		};
+		ThrowIfFailed(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)), "create graphics pipeline state");
+
 		ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
 			m_commandAllocator.Get(), nullptr, 
 			IID_PPV_ARGS(&m_commandList)), "Create CommandList");
 		ThrowIfFailed(m_commandList->Close(), "close command list");
+
+		D3D12_HEAP_PROPERTIES heapProps = {
+			.Type = D3D12_HEAP_TYPE_UPLOAD,
+			.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN,            
+			.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN,            
+			.CreationNodeMask = 1,
+			.VisibleNodeMask = 1,
+		};
+		D3D12_RESOURCE_DESC desc = {
+			.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
+			.Alignment = 0,
+			.Width = VERTEX_BUFFER_SIZE,
+			.Height = 1,
+			.DepthOrArraySize = 1,
+			.MipLevels = 1,
+			.Format = DXGI_FORMAT_UNKNOWN,
+			.SampleDesc = {.Count = 1, .Quality = 0 },
+			.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
+			.Flags = D3D12_RESOURCE_FLAG_NONE,
+
+		};
+		ThrowIfFailed(m_device->CreateCommittedResource(
+			&heapProps,
+			D3D12_HEAP_FLAG_NONE,
+			&desc,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(&m_vertexBuffer)), "create comitted resource");
+
+		// TODO po ID3D12Device::CreateCommittedResource (d3d12.h). z czytanki
+
 		ThrowIfFailed(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)), "create fence");
 		m_fenceValue = 1;
 
