@@ -36,7 +36,7 @@ namespace {
 
 	std::chrono::high_resolution_clock::time_point start_point = std::chrono::high_resolution_clock::now();
 
-	inline void WaitForPreviousFrame();
+	void WaitForPreviousFrame();
 
 	double get_time() {
 		std::chrono::high_resolution_clock::time_point now_point = std::chrono::high_resolution_clock::now();
@@ -44,7 +44,7 @@ namespace {
 		return microseconds_passed / 1000000;
 	}
 
-	inline void LoadPipeline(HWND hwnd) {
+	void LoadPipeline(HWND hwnd) {
 #if defined(_DEBUG)
 		{
 
@@ -166,7 +166,7 @@ namespace {
 		}
 	}
 	
-	inline void LoadAssets() {
+	void LoadAssets() {
 		error_code = m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
 			m_commandAllocator.Get(), nullptr, 
 			IID_PPV_ARGS(&m_commandList));
@@ -196,10 +196,15 @@ namespace {
 		// Wait for the command list to execute; we are reusing the same command 
 		// list in our main loop but for now, we just want to wait for setup to 
 		// complete before continuing.
-		WaitForPreviousFrame();
+		try {
+			WaitForPreviousFrame();
+		}
+		catch (std::runtime_error &er) {
+			throw er;
+		}
 	}
 
-	inline void PopulateCommandList() {
+	void PopulateCommandList() {
 		error_code = m_commandAllocator->Reset();
 		if (FAILED(error_code)) {
 			throw std::runtime_error("Fail at reset command allocator");
@@ -255,7 +260,7 @@ namespace {
 		m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 	}
 
-	inline void WaitForPreviousFrame()
+	void WaitForPreviousFrame()
 	{
 		const UINT64 fence = m_fenceValue;
 		error_code = m_commandQueue->Signal(m_fence.Get(), fence);
@@ -278,8 +283,13 @@ namespace {
 }
 
 void OnInit(HWND hwnd) {
-	LoadPipeline(hwnd);
-	LoadAssets();
+	try {
+		LoadPipeline(hwnd);
+		LoadAssets();
+	}
+	catch (std::runtime_error& er) {
+		throw er;
+	}
 }
 
 void OnUpdate(){
@@ -297,16 +307,26 @@ void OnRender()
 		throw std::runtime_error("Fail at Present");
 	}
 
-	WaitForPreviousFrame();
+	try {
+		WaitForPreviousFrame();
+	}
+	catch (std::runtime_error& er) {
+		throw er;
+	}
 }
 
 void OnDestroy() {
-	WaitForPreviousFrame();
-	CloseHandle(m_fenceEvent);
+	try {
+		WaitForPreviousFrame();
+		CloseHandle(m_fenceEvent);
+	}
+	catch (std::runtime_error& er) {
+		throw er;
+	}
 }
 
 void InitTimer(HWND hwnd) {
-	timer = SetTimer(hwnd, NULL, NULL, NULL);
+	timer = SetTimer(hwnd, 0, 0, 0);
 }
 
 void ReleaseTimer(HWND hwnd) {

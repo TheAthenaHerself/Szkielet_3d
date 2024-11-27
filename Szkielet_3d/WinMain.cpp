@@ -22,12 +22,12 @@ int WINAPI wWinMain(
     wc.cbClsExtra = 0;
     wc.cbWndExtra = DLGWINDOWEXTRA;
     wc.hInstance = hInstance;
-    wc.hIcon = NULL;
-    wc.hCursor = NULL;
-    wc.hbrBackground = NULL;
-    wc.lpszMenuName = NULL;
+    wc.hIcon = nullptr;
+    wc.hCursor = nullptr;
+    wc.hbrBackground = nullptr;
+    wc.lpszMenuName = nullptr;
     wc.lpszClassName = CLASS_NAME;
-    wc.hIconSm = NULL;
+    wc.hIconSm = nullptr;
 
     RegisterClassEx(&wc);
 
@@ -40,13 +40,13 @@ int WINAPI wWinMain(
         // Size and position
         CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
 
-        NULL,       // Parent window    
-        NULL,       // Menu
+        nullptr,       // Parent window    
+        nullptr,       // Menu
         hInstance,  // Instance handle
-        NULL        // Additional application data
+        nullptr        // Additional application data
     );
 
-    if (hwnd == NULL)
+    if (hwnd == nullptr)
     {
         return 1;
     }
@@ -54,7 +54,7 @@ int WINAPI wWinMain(
     ShowWindow(hwnd, nCmdShow);
 
     MSG msg = { };
-    while (GetMessage(&msg, NULL, 0, 0) > 0)
+    while (GetMessage(&msg, nullptr, 0, 0) > 0)
     {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
@@ -87,7 +87,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             return 0;
         }
     }
-    catch (std::runtime_error error) {
+    catch (std::runtime_error &error) {
         std::string str(error.what());
         str = "\n" + str + "\n";
         std::wstring wsTmp(str.begin(), str.end());
