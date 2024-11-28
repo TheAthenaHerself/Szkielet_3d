@@ -25,7 +25,7 @@ namespace {
 	vertex_t triangle_data[] = {
 	  { 0.0f, 1.0f, 0.5f,         0.0f, 1.0f, 0.0f, 1.0f },
 	  { 1.0f, 0.0f, 0.5f,         1.0f, 0.0f, 0.0f, 1.0f },
-	  { -1.0f, -1.0f, 0.5f,       0.0f, 0.0f, 1.0f, 1.0f }
+	  { -1.0f, -0.5f, 0.5f,       1.0f, 1.0f, 1.0f, 1.0f }
 	};
 	size_t const VERTEX_BUFFER_SIZE = sizeof(triangle_data);
 	size_t const NUM_VERTICES = VERTEX_BUFFER_SIZE / sizeof(vertex_t);
