@@ -4,6 +4,8 @@
 #include <stdexcept>
 #include <chrono>
 
+#include "vertex_shader.h"
+#include "pixel_shader.h"
 #include "Throws.h"
 #include "Direct3d.h"
 
@@ -11,6 +13,8 @@ using Microsoft::WRL::ComPtr;
 
 namespace {
 	static const UINT FrameCount = 2;
+
+	HWND hwnd;
 
 	struct vertex_t {
 		FLOAT position[3];
@@ -26,14 +30,15 @@ namespace {
 	size_t const VERTEX_BUFFER_SIZE = sizeof(triangle_data);
 	size_t const NUM_VERTICES = VERTEX_BUFFER_SIZE / sizeof(vertex_t);
 
-
+	D3D12_VIEWPORT m_viewport;
+	D3D12_RECT m_scissorRect;
 	ComPtr<IDXGISwapChain3> m_swapChain;
 	ComPtr<ID3D12Device> m_device;
 	ComPtr<ID3D12Resource> m_renderTargets[FrameCount];
-	ComPtr<ID3D12CommandAllocator> m_commandAllocator;
+	ComPtr<ID3D12CommandAllocator> m_commandAllocator[FrameCount];
 	ComPtr<ID3D12CommandQueue> m_commandQueue;
 	ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
-	ComPtr<ID3D12GraphicsCommandList> m_commandList;
+	ComPtr<ID3D12GraphicsCommandList> m_commandList[FrameCount];
 	UINT m_rtvDescriptorSize;
 
 	ComPtr<ID3D12RootSignature> m_rootSignature;
@@ -64,7 +69,7 @@ namespace {
 		return microseconds_passed / 1000000;
 	}
 
-	void LoadPipeline(HWND hwnd) {
+	void LoadPipeline() {
 #if defined(_DEBUG)
 		{
 
@@ -158,8 +163,9 @@ namespace {
 			m_rtvHandles[n] = rtvHandle;
 
 			rtvHandle.ptr += m_rtvDescriptorSize;
+			ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator[n])), "CreateCommandAllocator");
 		}
-		ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)), "CreateCommandAllocator");
+		
 	}
 	
 	void LoadAssets() {
@@ -242,11 +248,13 @@ namespace {
 		};
 		ThrowIfFailed(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)), "create graphics pipeline state");
 
-		ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-			m_commandAllocator.Get(), nullptr, 
-			IID_PPV_ARGS(&m_commandList)), "Create CommandList");
-		ThrowIfFailed(m_commandList->Close(), "close command list");
-
+		for (int n = 0; n < FrameCount; n++) {
+			ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
+				m_commandAllocator[n].Get(), nullptr,
+				IID_PPV_ARGS(&m_commandList[n])), "Create CommandList");
+			ThrowIfFailed(m_commandList[n]->Close(), "close command list");
+		}
+		
 		D3D12_HEAP_PROPERTIES heapProps = {
 			.Type = D3D12_HEAP_TYPE_UPLOAD,
 			.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN,            
@@ -275,7 +283,18 @@ namespace {
 			nullptr,
 			IID_PPV_ARGS(&m_vertexBuffer)), "create comitted resource");
 
-		// TODO po ID3D12Device::CreateCommittedResource (d3d12.h). z czytanki
+		void* pVertexDataBegin;
+		D3D12_RANGE  readRange = {
+			.Begin = 0,
+			.End = 0,
+		};        // We do not intend to read from this resource on the CPU.
+		ThrowIfFailed(m_vertexBuffer->Map(0, &readRange, &pVertexDataBegin), "vertex buffer map");
+		memcpy(pVertexDataBegin, triangle_data, sizeof(triangle_data));
+		m_vertexBuffer->Unmap(0, nullptr);
+
+		m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
+		m_vertexBufferView.StrideInBytes = sizeof(vertex_t);
+		m_vertexBufferView.SizeInBytes = sizeof(triangle_data);
 
 		ThrowIfFailed(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)), "create fence");
 		m_fenceValue = 1;
@@ -294,8 +313,21 @@ namespace {
 	}
 
 	void PopulateCommandList() {
-		ThrowIfFailed(m_commandAllocator->Reset(), "reset command allocator");
-		ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), nullptr), "reset command list");
+		ThrowIfFailed(m_commandAllocator[m_frameIndex]->Reset(), "reset command allocator");
+		ThrowIfFailed(m_commandList[m_frameIndex]->Reset(m_commandAllocator[m_frameIndex].Get(), m_pipelineState.Get()), "reset command list");
+
+		m_commandList[m_frameIndex]->SetGraphicsRootSignature(m_rootSignature.Get());
+		GetClientRect(hwnd, &m_scissorRect);
+		m_viewport = {
+			.TopLeftX = 0.0f,
+			.TopLeftY = 0.0f,
+			.Width = static_cast<FLOAT>(m_scissorRect.right - m_scissorRect.left),	// aktualna szerokoœæ obszaru roboczego okna (celu rend.)
+			.Height = static_cast<FLOAT>(m_scissorRect.bottom - m_scissorRect.top),	// aktualna wysokoœæ obszaru roboczego okna (celu rend.)
+			.MinDepth = 0.0f,
+			.MaxDepth = 1.0f,
+		};
+		m_commandList[m_frameIndex]->RSSetViewports(1, &m_viewport);
+		m_commandList[m_frameIndex]->RSSetScissorRects(1, &m_scissorRect);
 
 		D3D12_RESOURCE_TRANSITION_BARRIER barrier = {
 			.pResource = m_renderTargets[m_frameIndex].Get(),
@@ -309,18 +341,22 @@ namespace {
 			.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE,
 			.Transition = barrier,
 		};
-		m_commandList->ResourceBarrier(1, &pbarrier);
+		m_commandList[m_frameIndex]->ResourceBarrier(1, &pbarrier);
 
-		m_commandList->OMSetRenderTargets(1, &m_rtvHandles[m_frameIndex], TRUE, nullptr);
+		m_commandList[m_frameIndex]->OMSetRenderTargets(1, &m_rtvHandles[m_frameIndex], TRUE, nullptr);
 
 		double time = get_time();
 
 		if (static_cast<int>(time) % 2 == 1) {
-			m_commandList->ClearRenderTargetView(m_rtvHandles[m_frameIndex], blue, 0, nullptr);
+			m_commandList[m_frameIndex]->ClearRenderTargetView(m_rtvHandles[m_frameIndex], blue, 0, nullptr);
 		}
 		else {
-			m_commandList->ClearRenderTargetView(m_rtvHandles[m_frameIndex], yellow, 0, nullptr);
+			m_commandList[m_frameIndex]->ClearRenderTargetView(m_rtvHandles[m_frameIndex], yellow, 0, nullptr);
 		}
+		
+		m_commandList[m_frameIndex]->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+		m_commandList[m_frameIndex]->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		m_commandList[m_frameIndex]->DrawInstanced(3, 1, 0, 0);
 
 		barrier = {
 			.pResource = m_renderTargets[m_frameIndex].Get(),
@@ -334,9 +370,9 @@ namespace {
 			.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE,
 			.Transition = barrier,
 		};
-		m_commandList->ResourceBarrier(1, &pbarrier);
+		m_commandList[m_frameIndex]->ResourceBarrier(1, &pbarrier);
 
-		ThrowIfFailed(m_commandList->Close(), "close command list");
+		ThrowIfFailed(m_commandList[m_frameIndex]->Close(), "close command list");
 		m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 	}
 
@@ -356,8 +392,9 @@ namespace {
 	}
 }
 
-void OnInit(HWND hwnd) {
-	LoadPipeline(hwnd);
+void OnInit(HWND _hwnd) {
+	hwnd = _hwnd;
+	LoadPipeline();
 	LoadAssets();
 }
 
@@ -368,7 +405,7 @@ void OnRender()
 {
 	PopulateCommandList();
 
-	ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
+	ID3D12CommandList* ppCommandLists[] = { m_commandList[m_frameIndex].Get() };
 	m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
 	ThrowIfFailed(m_swapChain->Present(1, 0), "Present");
