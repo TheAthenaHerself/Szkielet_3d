@@ -3,6 +3,7 @@
 #include <wrl.h>
 #include <stdexcept>
 #include <chrono>
+#include <directxmath.h>
 
 #include "vertex_shader.h"
 #include "pixel_shader.h"
@@ -10,6 +11,8 @@
 #include "Direct3d.h"
 
 using Microsoft::WRL::ComPtr;
+using DirectX::XMFLOAT4X4;
+using DirectX::XMFLOAT4;
 
 namespace {
 	static const UINT FrameCount = 2;
@@ -47,6 +50,9 @@ namespace {
 	ComPtr<ID3D12Resource> m_vertexBuffer;
 	D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
 
+	ComPtr<ID3D12DescriptorHeap> constbufDescHeap;
+	ComPtr<ID3D12Resource> constbufResource;
+
 	UINT_PTR timer;
 
 	UINT m_frameIndex = 0;
@@ -60,6 +66,14 @@ namespace {
 	D3D12_CPU_DESCRIPTOR_HANDLE m_rtvHandles[FrameCount];
 
 	std::chrono::high_resolution_clock::time_point start_point = std::chrono::high_resolution_clock::now();
+
+	struct vs_const_buffer_t {
+		XMFLOAT4X4 matWorldViewProj;
+		XMFLOAT4 padding[(256 - sizeof(XMFLOAT4X4)) / sizeof(XMFLOAT4)];
+	};
+
+	vs_const_buffer_t constbuf;
+	void* cosntbufbegin;
 
 	void WaitForPreviousFrame();
 
@@ -169,12 +183,30 @@ namespace {
 	}
 	
 	void LoadAssets() {
+		D3D12_DESCRIPTOR_RANGE desc_range = {
+			.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV,
+			.NumDescriptors = 1,
+			.BaseShaderRegister = 0,
+			.RegisterSpace = 0,
+			.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND,
+		};
+
+		D3D12_ROOT_PARAMETER root_parameter[] = { {
+			.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE,
+			.DescriptorTable = { 1, &desc_range },
+			.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX,
+		} };
+
 		D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {
-			.NumParameters = 0,
-			.pParameters = nullptr,
+			.NumParameters = _countof(root_parameter),
+			.pParameters = root_parameter,
 			.NumStaticSamplers = 0,
 			.pStaticSamplers = nullptr,
-			.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
+			.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS
 		};
 
 		ComPtr<ID3DBlob> signature;
@@ -254,7 +286,62 @@ namespace {
 				IID_PPV_ARGS(&m_commandList[n])), "Create CommandList");
 			ThrowIfFailed(m_commandList[n]->Close(), "close command list");
 		}
+
+		D3D12_DESCRIPTOR_HEAP_DESC heapDescConstBuf = {
+			.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+			.NumDescriptors = 1,
+			.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
+			.NodeMask = 0
+		};
+
+		ThrowIfFailed(m_device->CreateDescriptorHeap(&heapDescConstBuf, IID_PPV_ARGS(&constbufDescHeap)), "DescriptorHeapConstBuf");
 		
+		D3D12_HEAP_PROPERTIES heapPropConstBuf = {
+			.Type = D3D12_HEAP_TYPE_UPLOAD,
+			.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN,            
+			.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN,            
+			.CreationNodeMask = 1,
+			.VisibleNodeMask = 1,
+		};
+
+		D3D12_RESOURCE_DESC descConstBuf = {
+			.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
+			.Alignment = 0,
+			.Width = 256, // todo check
+			.Height = 1,
+			.DepthOrArraySize = 1,
+			.MipLevels = 1,
+			.Format = DXGI_FORMAT_UNKNOWN,
+			.SampleDesc = {.Count = 1, .Quality = 0 },
+			.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
+			.Flags = D3D12_RESOURCE_FLAG_NONE,
+		};
+
+		ThrowIfFailed(m_device->CreateCommittedResource(
+			&heapPropConstBuf,
+			D3D12_HEAP_FLAG_NONE,
+			&descConstBuf,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(&constbufResource)), "create comitted resource for const buf");
+
+		D3D12_CONSTANT_BUFFER_VIEW_DESC viewDescConstBuf = {
+			.BufferLocation = constbufResource->GetGPUVirtualAddress(),
+			.SizeInBytes = 256, //todo check
+		};
+
+		m_device->CreateConstantBufferView(&viewDescConstBuf, constbufDescHeap->GetCPUDescriptorHandleForHeapStart());
+
+		DirectX::XMStoreFloat4x4(&constbuf.matWorldViewProj, DirectX::XMMatrixIdentity());
+
+		D3D12_RANGE  readRangeconstbuf = {
+			.Begin = 0,
+			.End = 0,
+		};
+
+		ThrowIfFailed(m_vertexBuffer->Map(0, &readRangeconstbuf, &cosntbufbegin), "vertex buffer map");
+		memcpy(cosntbufbegin, &constbuf, sizeof(constbuf));
+
 		D3D12_HEAP_PROPERTIES heapProps = {
 			.Type = D3D12_HEAP_TYPE_UPLOAD,
 			.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN,            
@@ -289,12 +376,12 @@ namespace {
 			.End = 0,
 		};        // We do not intend to read from this resource on the CPU.
 		ThrowIfFailed(m_vertexBuffer->Map(0, &readRange, &pVertexDataBegin), "vertex buffer map");
-		memcpy(pVertexDataBegin, triangle_data, sizeof(triangle_data));
+		memcpy(pVertexDataBegin, triangle_data, VERTEX_BUFFER_SIZE);
 		m_vertexBuffer->Unmap(0, nullptr);
 
 		m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
 		m_vertexBufferView.StrideInBytes = sizeof(vertex_t);
-		m_vertexBufferView.SizeInBytes = sizeof(triangle_data);
+		m_vertexBufferView.SizeInBytes = VERTEX_BUFFER_SIZE;
 
 		ThrowIfFailed(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)), "create fence");
 		m_fenceValue = 1;
