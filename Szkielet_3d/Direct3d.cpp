@@ -13,6 +13,12 @@
 using Microsoft::WRL::ComPtr;
 using DirectX::XMFLOAT4X4;
 using DirectX::XMFLOAT4;
+using DirectX::XMMATRIX;
+using DirectX::XMMatrixMultiply;
+using DirectX::XMMatrixRotationY;
+using DirectX::XMMatrixRotationX;
+using DirectX::XMMatrixTranslation;
+using DirectX::XMMatrixPerspectiveFovLH;
 
 namespace {
 	static const UINT FrameCount = 2;
@@ -30,7 +36,68 @@ namespace {
 	  { 1.0f, 0.0f, 0.5f,         1.0f, 0.0f, 0.0f, 1.0f },
 	  { -1.0f, -0.5f, 0.5f,       1.0f, 1.0f, 1.0f, 1.0f }
 	};
-	size_t const VERTEX_BUFFER_SIZE = sizeof(triangle_data);
+
+	vertex_t box_data[] = {
+		// front
+		{ {-1.0f, 1.0f, -1.0f}, {1.0f, 1.0f, 0.5f, 1.0f}},
+		{  {1.0f, 1.0f, -1.0f}, {1.0f, 1.0f, 0.5f, 1.0f}},
+		{{-1.0f, -1.0f, -1.0f}, {0.5f, 0.5f, 0.0f, 1.0f}},
+
+		{{1.0f, 1.0f, -1.0f}, {1.0f, 1.0f, 0.5f, 1.0f}},
+		{ {1.0f, -1.0f, -1.0f}, {0.5f, 0.5f, 0.0f, 1.0f}},
+		{{-1.0f, -1.0f, -1.0f}, {0.5f, 0.5f, 0.0f, 1.0f}},
+
+		// right
+		{  {1.0f, 1.0f, -1.0f}, {1.0f, 0.5f, 0.0f, 1.0f}},
+		{   {1.0f, 1.0f, 1.0f}, {1.0f, 0.5f, 0.0f, 1.0f}},
+		{ {1.0f, -1.0f, -1.0f}, {0.5f, 0.0f, 0.0f, 1.0f}},
+
+		{   {1.0f, 1.0f, 1.0f}, {1.0f, 0.5f, 0.0f, 1.0f}},
+		{  {1.0f, -1.0f, 1.0f}, {0.5f, 0.0f, 0.0f, 1.0f}},
+		{ {1.0f, -1.0f, -1.0f}, {0.5f, 0.0f, 0.0f, 1.0f}},
+
+		// left
+
+		{  {-1.0f, 1.0f, 1.0f}, {1.0f, 0.5f, 0.0f, 1.0f}},
+		{ {-1.0f, 1.0f, -1.0f}, {1.0f, 0.5f, 0.0f, 1.0f}},
+		{{-1.0f, -1.0f, -1.0f}, {0.5f, 0.0f, 0.0f, 1.0f}},
+
+
+		{ {-1.0f, -1.0f, 1.0f}, {0.5f, 0.0f, 0.0f, 1.0f}},
+		{  {-1.0f, 1.0f, 1.0f}, {1.0f, 0.5f, 0.0f, 1.0f}},
+		{{-1.0f, -1.0f, -1.0f}, {0.5f, 0.0f, 0.0f, 1.0f}},
+
+		// back
+
+		{   {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 0.5f, 1.0f}},
+			{ {-1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 0.5f, 1.0f}},
+		{{-1.0f, -1.0f, 1.0f}, {0.5f, 0.5f, 0.0f, 1.0f}},
+
+		{  {1.0f, -1.0f, 1.0f}, {0.5f, 0.5f, 0.0f, 1.0f}},
+		{  {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 0.5f, 1.0f}},
+		{{-1.0f, -1.0f, 1.0f}, {0.5f, 0.5f, 0.0f, 1.0f}},
+
+		// top
+		{   {-1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 0.5f, 1.0f}},
+		{  {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 0.5f, 1.0f}},
+		{ {-1.0f,  1.0f, -1.0f}, {0.5f, 0.5f, 0.0f, 1.0f}},
+
+
+		{ {-1.0f, 1.0f, -1.0f}, {0.5f, 0.5f, 0.0f, 1.0f}},
+		{   {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 0.5f, 1.0f}},
+		{ {1.0f,  1.0f, -1.0f}, {0.5f, 0.5f, 0.0f, 1.0f}},
+
+		// bottom
+		{  {1.0f, -1.0f, 1.0f}, {1.0f, 1.0f, 0.5f, 1.0f}},
+		{  {-1.0f, -1.0f, 1.0f}, {1.0f, 1.0f, 0.5f, 1.0f}},
+		{ {-1.0f, -1.0f, -1.0f}, {0.5f, 0.5f, 0.0f, 1.0f}},
+
+		{  {1.0f, -1.0f, 1.0f}, {1.0f, 1.0f, 0.5f, 1.0f}},
+		{ {-1.0f, -1.0f, -1.0f}, {0.5f, 0.5f, 0.0f, 1.0f}},
+		{  {1.0f, -1.0f, -1.0f}, {0.5f, 0.5f, 0.0f, 1.0f}},
+	};
+
+	size_t const VERTEX_BUFFER_SIZE = sizeof(box_data);
 	size_t const NUM_VERTICES = VERTEX_BUFFER_SIZE / sizeof(vertex_t);
 
 	D3D12_VIEWPORT m_viewport;
@@ -73,7 +140,9 @@ namespace {
 	};
 
 	vs_const_buffer_t constbuf;
-	void* cosntbufbegin;
+	void* constbufbegin;
+
+	FLOAT angle = 0.0f;
 
 	void WaitForPreviousFrame();
 
@@ -276,7 +345,7 @@ namespace {
 			.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
 			.NumRenderTargets = 1,
 			.RTVFormats = { DXGI_FORMAT_R8G8B8A8_UNORM },
-			.SampleDesc = {.Count = 1, .Quality = 0 }
+			.SampleDesc = {.Count = 1, .Quality = 0 },
 		};
 		ThrowIfFailed(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)), "create graphics pipeline state");
 
@@ -291,7 +360,7 @@ namespace {
 			.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
 			.NumDescriptors = 1,
 			.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
-			.NodeMask = 0
+			.NodeMask = 0,
 		};
 
 		ThrowIfFailed(m_device->CreateDescriptorHeap(&heapDescConstBuf, IID_PPV_ARGS(&constbufDescHeap)), "DescriptorHeapConstBuf");
@@ -339,8 +408,8 @@ namespace {
 			.End = 0,
 		};
 
-		ThrowIfFailed(m_vertexBuffer->Map(0, &readRangeconstbuf, &cosntbufbegin), "vertex buffer map");
-		memcpy(cosntbufbegin, &constbuf, sizeof(constbuf));
+		ThrowIfFailed(constbufResource->Map(0, &readRangeconstbuf, &constbufbegin), "vertex buffer map");
+		memcpy(constbufbegin, &constbuf, sizeof(constbuf));
 
 		D3D12_HEAP_PROPERTIES heapProps = {
 			.Type = D3D12_HEAP_TYPE_UPLOAD,
@@ -376,7 +445,7 @@ namespace {
 			.End = 0,
 		};        // We do not intend to read from this resource on the CPU.
 		ThrowIfFailed(m_vertexBuffer->Map(0, &readRange, &pVertexDataBegin), "vertex buffer map");
-		memcpy(pVertexDataBegin, triangle_data, VERTEX_BUFFER_SIZE);
+		memcpy(pVertexDataBegin, box_data, VERTEX_BUFFER_SIZE);
 		m_vertexBuffer->Unmap(0, nullptr);
 
 		m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
@@ -404,6 +473,11 @@ namespace {
 		ThrowIfFailed(m_commandList[m_frameIndex]->Reset(m_commandAllocator[m_frameIndex].Get(), m_pipelineState.Get()), "reset command list");
 
 		m_commandList[m_frameIndex]->SetGraphicsRootSignature(m_rootSignature.Get());
+
+		ID3D12DescriptorHeap* ppHeaps[] = { constbufDescHeap.Get() };
+		m_commandList[m_frameIndex]->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+		m_commandList[m_frameIndex]->SetGraphicsRootDescriptorTable(0, constbufDescHeap->GetGPUDescriptorHandleForHeapStart());
+
 		GetClientRect(hwnd, &m_scissorRect);
 		m_viewport = {
 			.TopLeftX = 0.0f,
@@ -440,10 +514,9 @@ namespace {
 		else {
 			m_commandList[m_frameIndex]->ClearRenderTargetView(m_rtvHandles[m_frameIndex], yellow, 0, nullptr);
 		}
-		
 		m_commandList[m_frameIndex]->IASetVertexBuffers(0, 1, &m_vertexBufferView);
 		m_commandList[m_frameIndex]->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		m_commandList[m_frameIndex]->DrawInstanced(3, 1, 0, 0);
+		m_commandList[m_frameIndex]->DrawInstanced(NUM_VERTICES, 1, 0, 0);
 
 		barrier = {
 			.pResource = m_renderTargets[m_frameIndex].Get(),
@@ -486,6 +559,26 @@ void OnInit(HWND _hwnd) {
 }
 
 void OnUpdate(){
+	angle += 1.0f / 64.0f;
+	XMMATRIX wvp_matrix;
+	wvp_matrix = XMMatrixMultiply(
+		XMMatrixRotationY(2.5f * angle),	// zmienna angle zmienia siê
+		// o 1 / 64 co ok. 15 ms 
+		XMMatrixRotationX(static_cast<FLOAT>(sin(angle)) / 2.0f));
+	wvp_matrix = XMMatrixMultiply(
+		wvp_matrix, XMMatrixTranslation(0.0f, 0.0f, 4.0f));
+	wvp_matrix = XMMatrixMultiply(
+		wvp_matrix, XMMatrixPerspectiveFovLH(
+			45.0f, m_viewport.Width / m_viewport.Height, 1.0f, 100.0f));
+	wvp_matrix = XMMatrixTranspose(wvp_matrix);
+	XMStoreFloat4x4(
+		&constbuf.matWorldViewProj, 	// zmienna typu vs_const_buffer_t z pkt. 2d
+		wvp_matrix);
+	memcpy(
+		constbufbegin, 		// wskaŸnik do zmapowanej pamiêci (buf. sta³ego)
+		&constbuf, 		// zmienna typu vs_const_buffer_t z pkt. 2d
+		sizeof(constbuf)	// zmienna typu vs_const_buffer_t z pkt. 2d
+	);
 }
 
 void OnRender()
