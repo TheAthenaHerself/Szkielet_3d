@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <chrono>
 #include <directxmath.h>
+#include <numbers>
 
 #include "vertex_shader.h"
 #include "pixel_shader.h"
@@ -39,13 +40,98 @@ namespace {
 	  { 1.0f, 0.0f, 0.5f,         1.0f, 0.0f, 0.0f, 1.0f },
 	  { -1.0f, -0.5f, 0.5f,       1.0f, 1.0f, 1.0f, 1.0f }
 	};*/
+	size_t VERTEX_BUFFER_SIZE = 0;
+	size_t NUM_VERTICES = 0;
 
-	vertex_t box_data[] = {
+	std::vector<vertex_t> generate_data() {
+		std::vector<vertex_t > data;
+		constexpr static unsigned int cylinder_sides = 20;
+		float angle = 2 * std::numbers::pi / cylinder_sides;
+
+
+		vertex_t lower_next_side = {
+			{1.0f, -1.0f, 0.0f},
+			{1.0f, 0.0f, 0.0f},
+			{0.2f, 1.0f, 1.0f, 1.0f}
+		};
+
+		vertex_t lower_next_flat = {
+			{1.0f, -1.0f, 0.0f},
+			{0.0f, -1.0f, 0.0f},
+			{0.2f, 1.0f, 1.0f, 1.0f}
+		};
+
+		vertex_t upper_middle = {
+			{0.0f, 1.0f, 0.0f},
+			{0.0f, 1.0f, 0.0f},
+			{0.2f, 1.0f, 1.0f, 1.0f}
+		};
+		vertex_t lower_middle = {
+			{0.0f, -1.0f, 0.0f},
+			{0.0f, -1.0f, 0.0f},
+			{0.2f, 1.0f, 1.0f, 1.0f}
+		};
+
+		for (unsigned int i = 1; i <= cylinder_sides; i++) {
+
+			vertex_t lower_current_side = lower_next_side;
+			lower_next_side = {
+				{std::cos(angle * i), -1.0f, std::sin(angle * i)},
+				{std::cos(angle * i), 0.0f, std::sin(angle * i)},
+				{0.2f, 1.0f, 1.0f, 1.0f}
+			};
+
+			vertex_t upper_current_side = lower_current_side;
+			upper_current_side.position[1] = 1;
+			vertex_t upper_next_side = lower_next_side;
+			upper_next_side.position[1] = 1;
+
+			data.push_back(lower_current_side);
+			data.push_back(upper_current_side);
+			data.push_back(lower_next_side);
+			data.push_back(lower_next_side);
+			data.push_back(upper_current_side);
+			data.push_back(upper_next_side);
+
+			vertex_t lower_current_flat = lower_next_flat;
+			lower_next_flat = {
+				{std::cos(angle * i), -1.0f, std::sin(angle * i)},
+				{0.0f, -1.0f, 0.0f},
+				{0.2f, 1.0f, 1.0f, 1.0f}
+			};
+
+			vertex_t upper_current_flat = lower_current_flat;
+			upper_current_flat.position[1] = 1;
+			upper_current_flat.normal[1] = 1;
+			vertex_t upper_next_flat = lower_next_flat;
+			upper_next_flat.position[1] = 1;
+			upper_next_flat.normal[1] = 1;
+
+			data.push_back(lower_current_flat);
+			data.push_back(lower_next_flat);
+			data.push_back(lower_middle);
+			data.push_back(upper_next_flat);
+			data.push_back(upper_current_flat);
+			data.push_back(upper_middle);
+		}
+		std::wstringstream ws;
+		ws << data.size() << "\n";
+		OutputDebugString(ws.str().c_str());
+
+		NUM_VERTICES = data.size();
+		VERTEX_BUFFER_SIZE = NUM_VERTICES * sizeof(vertex_t);
+		return data;
+	}
+
+	/*std::vector<vertex_t> box_data = {
 		{ {-1.0f, 1.0f, -1.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 0.5f, 1.0f}},
 		{  {1.0f, 1.0f, -1.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 0.5f, 1.0f}},
 		{{-1.0f, -1.0f, -1.0f}, {1.0f, 0.0f, 0.0f}, {0.5f, 0.5f, 0.0f, 1.0f}},
+		{ {-1.0f, -1.0f, -1.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 0.5f, 1.0f}},
+		{  {1.0f, -1.0f, -1.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 0.5f, 1.0f}},
+		{{-1.0f, 1.0f, -1.0f}, {1.0f, 0.0f, 0.0f}, {0.5f, 0.5f, 0.0f, 1.0f}},
 	};
-
+	
 	/*vertex_t box_data[] = {
 		// front
 		{ {-1.0f, 1.0f, -1.0f}, {1.0f, 1.0f, 0.5f, 1.0f}},
@@ -104,10 +190,9 @@ namespace {
 		{  {1.0f, -1.0f, 1.0f}, {1.0f, 1.0f, 0.5f, 1.0f}},
 		{ {-1.0f, -1.0f, -1.0f}, {0.5f, 0.5f, 0.0f, 1.0f}},
 		{  {1.0f, -1.0f, -1.0f}, {0.5f, 0.5f, 0.0f, 1.0f}},
-	};*/
+	};
 
-	size_t const VERTEX_BUFFER_SIZE = sizeof(box_data);
-	size_t const NUM_VERTICES = VERTEX_BUFFER_SIZE / sizeof(vertex_t);
+	*/
 
 	D3D12_VIEWPORT m_viewport;
 	D3D12_RECT m_scissorRect;
@@ -312,6 +397,15 @@ namespace {
 			  .InstanceDataStepRate = 0
 			},
 			{
+			  .SemanticName = "NORMAL",
+			  .SemanticIndex = 0,
+			  .Format = DXGI_FORMAT_R32G32B32_FLOAT,
+			  .InputSlot = 0,
+			  .AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT,
+			  .InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+			  .InstanceDataStepRate = 0
+			},
+			{
 			  .SemanticName = "COLOR",
 			  .SemanticIndex = 0,
 			  .Format = DXGI_FORMAT_R32G32B32A32_FLOAT,
@@ -505,6 +599,9 @@ namespace {
 		DirectX::XMStoreFloat4x4(&constbuf.matWorldViewProj, DirectX::XMMatrixIdentity());
 		DirectX::XMStoreFloat4x4(&constbuf.matWorldView, DirectX::XMMatrixIdentity());
 		DirectX::XMStoreFloat4x4(&constbuf.matView, DirectX::XMMatrixIdentity());
+		constbuf.colLight = { 1.0f, 0.7f, 0.4f, 1.0f };
+		constbuf.colMaterial = { 0.8f, 0.1f, 0.1f, 1.0f };
+		constbuf.dirLight = { 1.0f, 1.0f, 1.0f, 0.0f };
 
 		D3D12_RANGE  readRangeconstbuf = {
 			.Begin = 0,
@@ -513,6 +610,7 @@ namespace {
 
 		ThrowIfFailed(constbufResource->Map(0, &readRangeconstbuf, &constbufbegin), "vertex buffer map");
 		memcpy(constbufbegin, &constbuf, sizeof(constbuf));
+		std::vector<vertex_t> box_data = generate_data();
 		{
 			D3D12_HEAP_PROPERTIES heapProps = {
 				.Type = D3D12_HEAP_TYPE_UPLOAD,
@@ -547,8 +645,9 @@ namespace {
 			.Begin = 0,
 			.End = 0,
 		};        // We do not intend to read from this resource on the CPU.
+
 		ThrowIfFailed(m_vertexBuffer->Map(0, &readRange, &pVertexDataBegin), "vertex buffer map");
-		memcpy(pVertexDataBegin, box_data, VERTEX_BUFFER_SIZE);
+		memcpy(pVertexDataBegin, box_data.data(), VERTEX_BUFFER_SIZE);
 		m_vertexBuffer->Unmap(0, nullptr);
 
 		m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
@@ -671,20 +770,30 @@ void OnInit(HWND _hwnd) {
 
 void OnUpdate(){
 	angle += 1.0f / 64.0f;
-	XMMATRIX wvp_matrix;
-	wvp_matrix = XMMatrixMultiply(
+	XMMATRIX world, view, proj;
+	world = XMMatrixMultiply(
 		XMMatrixRotationY(2.5f * angle),	// zmienna angle zmienia siê
 		// o 1 / 64 co ok. 15 ms 
 		XMMatrixRotationX(static_cast<FLOAT>(sin(angle)) / 2.0f));
-	wvp_matrix = XMMatrixMultiply(
-		wvp_matrix, XMMatrixTranslation(0.0f, 0.0f, 4.0f));
-	wvp_matrix = XMMatrixMultiply(
-		wvp_matrix, XMMatrixPerspectiveFovLH(
-			45.0f, m_viewport.Width / m_viewport.Height, 1.0f, 100.0f));
-	wvp_matrix = XMMatrixTranspose(wvp_matrix);
+	view = XMMatrixTranslation(0.0f, 0.0f, 4.0f);
+	proj = XMMatrixPerspectiveFovLH(
+			45.0f, m_viewport.Width / m_viewport.Height, 1.0f, 100.0f);
+
+	XMMATRIX world_view = XMMatrixMultiply(world, view);
+	XMMATRIX world_view_proj = XMMatrixMultiply(world_view, proj);
+
+	view = XMMatrixTranspose(view);
+	world_view = XMMatrixTranspose(world_view);
+	world_view_proj = XMMatrixTranspose(world_view_proj);
 	XMStoreFloat4x4(
-		&constbuf.matWorldViewProj, 	// zmienna typu vs_const_buffer_t z pkt. 2d
-		wvp_matrix);
+		&constbuf.matWorldViewProj,
+		world_view_proj);
+	XMStoreFloat4x4(
+		&constbuf.matWorldView, //DUE TO ORTHOGONAL MATRIX
+		world_view);
+	XMStoreFloat4x4(
+		&constbuf.matView,
+		view);
 	memcpy(
 		constbufbegin, 		// wskaŸnik do zmapowanej pamiêci (buf. sta³ego)
 		&constbuf, 		// zmienna typu vs_const_buffer_t z pkt. 2d
