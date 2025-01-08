@@ -382,9 +382,21 @@ namespace {
 			.NodeMask = 0,
 		};
 
+
 		ThrowIfFailed(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)), "DescriptorHeap");
 		m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
+		GetClientRect(hwnd, &m_scissorRect);
+		width = m_scissorRect.right - m_scissorRect.left;
+		height = m_scissorRect.bottom - m_scissorRect.top;
+		m_viewport = {
+			.TopLeftX = 0.0f,
+			.TopLeftY = 0.0f,
+			.Width = static_cast<FLOAT>(m_scissorRect.right - m_scissorRect.left),	// aktualna szerokoœæ obszaru roboczego okna (celu rend.)
+			.Height = static_cast<FLOAT>(m_scissorRect.bottom - m_scissorRect.top),	// aktualna wysokoœæ obszaru roboczego okna (celu rend.)
+			.MinDepth = 0.0f,
+			.MaxDepth = 1.0f,
+		};
 
 		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
 
@@ -667,9 +679,9 @@ namespace {
 				.VisibleNodeMask = 1,
 			};
 
-			GetClientRect(hwnd, &m_scissorRect);
+			/*GetClientRect(hwnd, &m_scissorRect);
 			width = m_scissorRect.right - m_scissorRect.left;
-			height = m_scissorRect.bottom - m_scissorRect.top;
+			height = m_scissorRect.bottom - m_scissorRect.top;*/
 
 			D3D12_RESOURCE_DESC desc = {
 				.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D,
@@ -836,17 +848,7 @@ namespace {
 		m_commandList[m_frameIndex]->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 		m_commandList[m_frameIndex]->SetGraphicsRootDescriptorTable(0, constbufDescHeap->GetGPUDescriptorHandleForHeapStart());
 
-		GetClientRect(hwnd, &m_scissorRect);
-		width = m_scissorRect.right - m_scissorRect.left;
-		height = m_scissorRect.bottom - m_scissorRect.top;
-		m_viewport = {
-			.TopLeftX = 0.0f,
-			.TopLeftY = 0.0f,
-			.Width = static_cast<FLOAT>(m_scissorRect.right - m_scissorRect.left),	// aktualna szerokoœæ obszaru roboczego okna (celu rend.)
-			.Height = static_cast<FLOAT>(m_scissorRect.bottom - m_scissorRect.top),	// aktualna wysokoœæ obszaru roboczego okna (celu rend.)
-			.MinDepth = 0.0f,
-			.MaxDepth = 1.0f,
-		};
+		
 		m_commandList[m_frameIndex]->RSSetViewports(1, &m_viewport);
 		m_commandList[m_frameIndex]->RSSetScissorRects(1, &m_scissorRect);
 
@@ -868,14 +870,14 @@ namespace {
 
 		double time = get_time();
 
-		m_commandList[m_frameIndex]->ClearRenderTargetView(m_rtvHandles[m_frameIndex], black, 0, nullptr);
+		//m_commandList[m_frameIndex]->ClearRenderTargetView(m_rtvHandles[m_frameIndex], black, 0, nullptr);
 
-		/*if (static_cast<int>(time) % 2 == 1) {
+		if (static_cast<int>(time) % 2 == 1) {
 			m_commandList[m_frameIndex]->ClearRenderTargetView(m_rtvHandles[m_frameIndex], blue, 0, nullptr);
 		}
 		else {
 			m_commandList[m_frameIndex]->ClearRenderTargetView(m_rtvHandles[m_frameIndex], yellow, 0, nullptr);
-		}*/
+		}
 		m_commandList[m_frameIndex]->ClearDepthStencilView(depthbufDescHandle,
 			D3D12_CLEAR_FLAG_DEPTH,
 			1.0f,
