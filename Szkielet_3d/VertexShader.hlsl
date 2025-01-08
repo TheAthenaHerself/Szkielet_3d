@@ -1,5 +1,27 @@
 cbuffer vs_const_buffer_t {
     float4x4 matWorldViewProj;
+    float4 padding[12];
+};
+struct vs_output_t {
+    float4 position : SV_POSITION;
+    float4 color : COLOR;
+};
+vs_output_t main(
+    float3 pos : POSITION,
+    float4 col : COLOR,
+    row_major float4x4 mat_w : WORLD,
+    uint instance_id : SV_InstanceID
+) {
+    vs_output_t result;
+    result.position = mul(
+        float4(pos, 1.0f), mul(mat_w, matWorldViewProj));
+    result.color = col;
+    return result;
+}
+
+
+/*cbuffer vs_const_buffer_t {
+    float4x4 matWorldViewProj;
     float4x4 matWorldView;
     float4x4 matView;
     float4 colMaterial;
@@ -25,7 +47,7 @@ vs_output_t main(
         max(-dot(normalize(LW), normalize(NW)), 0.0f),
         colLight * col); // lub colMaterial zamiast col
     return result;
-}
+}*/
 
 /*cbuffer vs_const_buffer_t
 {

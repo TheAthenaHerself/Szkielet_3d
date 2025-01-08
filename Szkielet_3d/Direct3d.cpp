@@ -5,6 +5,8 @@
 #include <chrono>
 #include <directxmath.h>
 #include <numbers>
+#include <array>
+#include <random>
 
 #include "vertex_shader.h"
 #include "pixel_shader.h"
@@ -20,6 +22,11 @@ using DirectX::XMMatrixRotationY;
 using DirectX::XMMatrixRotationX;
 using DirectX::XMMatrixTranslation;
 using DirectX::XMMatrixPerspectiveFovLH;
+using std::array;
+using std::random_device;
+using std::mt19937;
+using std::uniform_real_distribution;
+using std::numbers::pi_v;
 
 namespace {
 	static const UINT FrameCount = 2;
@@ -28,19 +35,19 @@ namespace {
 
 	HWND hwnd;
 
-	struct vertex_t {
+	/*struct vertex_t {
 		FLOAT position[3];
 		FLOAT normal[3];
 		FLOAT color[4];
 	};
 
-	size_t const VERTEX_SIZE = sizeof(vertex_t) / sizeof(FLOAT);
+	size_t const VERTEX_SIZE = sizeof(vertex_t) / sizeof(FLOAT); */
 	/*vertex_t triangle_data[] = {
 	  { 0.0f, 1.0f, 0.5f,         0.0f, 1.0f, 0.0f, 1.0f },
 	  { 1.0f, 0.0f, 0.5f,         1.0f, 0.0f, 0.0f, 1.0f },
 	  { -1.0f, -0.5f, 0.5f,       1.0f, 1.0f, 1.0f, 1.0f }
 	};*/
-	size_t VERTEX_BUFFER_SIZE = 0;
+	/*size_t VERTEX_BUFFER_SIZE = 0;
 	size_t NUM_VERTICES = 0;
 
 	std::vector<vertex_t> generate_data() {
@@ -121,7 +128,7 @@ namespace {
 		NUM_VERTICES = data.size();
 		VERTEX_BUFFER_SIZE = NUM_VERTICES * sizeof(vertex_t);
 		return data;
-	}
+	}*/
 
 	/*std::vector<vertex_t> box_data = {
 		{ {-1.0f, 1.0f, -1.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 0.5f, 1.0f}},
@@ -194,6 +201,46 @@ namespace {
 
 	*/
 
+	struct vertex_t {
+		FLOAT position[3];
+		FLOAT color[4];
+	};
+	vertex_t stalk_data[] = {
+		// Pozycja (x, y, z)	Kolor (r, g, b, a)
+		0.0f, 0.0f, 0.0f,	0.0f, 0.25f, 0.0f, 1.0f,
+		0.015625f, 0.5f, 0.0f,	0.0f, 0.75f, 0.0f, 1.0f,
+		0.0546875f, 0.875f, 0.0f,	1.0f, 0.75f, 0.0f, 1.0f,
+		0.078125f, 1.0f, 0.0f,	0.5f, 0.25f, 0.0f, 1.0f
+	};
+	constinit size_t const VERTEX_BUFFER_SIZE = sizeof stalk_data;
+	constinit size_t const NUM_VERTICES = VERTEX_BUFFER_SIZE / sizeof(vertex_t);
+	constinit size_t const NUM_INSTANCES = 150000;
+
+	using instances_t = array<XMFLOAT4X4, NUM_INSTANCES>;
+	instances_t stalk_instances;
+	constinit size_t const INSTANCE_BUFFER_SIZE	= stalk_instances.size() * sizeof(instances_t::value_type);
+
+	void generate_stalks() {
+		random_device rd;
+		mt19937 gen(rd());
+		for (size_t k = 0; k < NUM_INSTANCES; ++k) {
+			XMStoreFloat4x4(
+				&stalk_instances[k],
+				XMMatrixMultiply(
+					XMMatrixRotationY(
+						uniform_real_distribution<FLOAT>(
+							0.0f, 2.0f * pi_v<FLOAT>)(gen)),
+					XMMatrixTranslation(
+						uniform_real_distribution<FLOAT>(-2.0f, 2.0f)(gen),
+						uniform_real_distribution<FLOAT>(
+							-1.0f / 16.0f, 3.0f / 16.0f)(gen),
+						uniform_real_distribution<FLOAT>(-1.0f, 1.0)(gen))));
+		}
+	}
+
+	ComPtr<ID3D12Resource> instance_buffer = nullptr;
+	D3D12_VERTEX_BUFFER_VIEW instance_buffer_view = {};
+
 	D3D12_VIEWPORT m_viewport;
 	D3D12_RECT m_scissorRect;
 	ComPtr<IDXGISwapChain3> m_swapChain;
@@ -226,6 +273,7 @@ namespace {
 	UINT64 m_fenceValue;
 
 	const float blue[] = { 0.0f, 0.0f, 255.0f, 1.0f };
+	const float black[] = { 0.0f, 0.0f, 0.0f, 1.0f };
 	const float yellow[] = { 255.0f, 255.0f, 0.0f, 1.0f };
 
 	D3D12_CPU_DESCRIPTOR_HANDLE m_rtvHandles[FrameCount];
@@ -355,6 +403,8 @@ namespace {
 	}
 	
 	void LoadAssets() {
+		generate_stalks();
+
 		D3D12_DESCRIPTOR_RANGE desc_range = {
 			.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV,
 			.NumDescriptors = 1,
@@ -386,7 +436,7 @@ namespace {
 		ThrowIfFailed(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error), "serialize root signature");
 		ThrowIfFailed(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)), "create root signature");
 
-		D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
+		/*D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
 			{
 			  .SemanticName = "POSITION",
 			  .SemanticIndex = 0,
@@ -414,7 +464,71 @@ namespace {
 			  .InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
 			  .InstanceDataStepRate = 0
 			}
+		};*/
+
+		D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
+			{
+			.SemanticName = "POSITION",
+			.SemanticIndex = 0,
+			.Format = DXGI_FORMAT_R32G32B32_FLOAT,
+			.InputSlot = 0,
+			.AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT,
+			.InputSlotClass =
+				D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+			.InstanceDataStepRate = 0
+			},
+			{
+			.SemanticName = "COLOR",
+			.SemanticIndex = 0,
+			.Format = DXGI_FORMAT_R32G32B32A32_FLOAT,
+			.InputSlot = 0,
+			.AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT,
+			.InputSlotClass =
+				D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+			.InstanceDataStepRate = 0
+			},
+			{ // Pierwszy wiersz macierzy instancji
+			.SemanticName = "WORLD",
+			.SemanticIndex = 0,
+			.Format = DXGI_FORMAT_R32G32B32A32_FLOAT,
+			.InputSlot = 1,
+			.AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT,
+			.InputSlotClass =
+				D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA,
+			.InstanceDataStepRate = 1
+			},
+			{  // Drugi wiersz macierzy instancji
+			.SemanticName = "WORLD",
+			.SemanticIndex = 1,
+			.Format = DXGI_FORMAT_R32G32B32A32_FLOAT,
+			.InputSlot = 1,
+			.AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT,
+			.InputSlotClass =
+				D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA,
+			.InstanceDataStepRate = 1
+			},
+			{  // Trzeci wiersz macierzy instancji
+			.SemanticName = "WORLD",
+			.SemanticIndex = 2,
+			.Format = DXGI_FORMAT_R32G32B32A32_FLOAT,
+			.InputSlot = 1,
+			.AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT,
+			.InputSlotClass =
+				D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA,
+			.InstanceDataStepRate = 1
+			},
+			{  // Czwarty wiersz macierzy instancji
+			.SemanticName = "WORLD",
+			.SemanticIndex = 3,
+			.Format = DXGI_FORMAT_R32G32B32A32_FLOAT,
+			.InputSlot = 1,
+			.AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT,
+			.InputSlotClass =
+				D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA,
+			.InstanceDataStepRate = 1
+			}
 		};
+
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {
 			.pRootSignature = m_rootSignature.Get(),
@@ -441,7 +555,7 @@ namespace {
 			.SampleMask = UINT_MAX,
 			.RasterizerState = {
 				.FillMode = D3D12_FILL_MODE_SOLID,
-				.CullMode = D3D12_CULL_MODE_BACK,
+				.CullMode = D3D12_CULL_MODE_NONE,
 				.FrontCounterClockwise = FALSE,
 				.DepthBias = D3D12_DEFAULT_DEPTH_BIAS,
 				.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP,
@@ -591,7 +705,7 @@ namespace {
 			};
 			depthbufDescHandle = depthbufDescHeap->GetCPUDescriptorHandleForHeapStart();
 			m_device->CreateDepthStencilView( // TODO check
-				nullptr,
+				depthbufResource.Get(),
 				&depth_stencil,
 				depthbufDescHandle);
 		}
@@ -610,7 +724,7 @@ namespace {
 
 		ThrowIfFailed(constbufResource->Map(0, &readRangeconstbuf, &constbufbegin), "vertex buffer map");
 		memcpy(constbufbegin, &constbuf, sizeof(constbuf));
-		std::vector<vertex_t> box_data = generate_data();
+		//std::vector<vertex_t> box_data = generate_data();
 		{
 			D3D12_HEAP_PROPERTIES heapProps = {
 				.Type = D3D12_HEAP_TYPE_UPLOAD,
@@ -647,12 +761,54 @@ namespace {
 		};        // We do not intend to read from this resource on the CPU.
 
 		ThrowIfFailed(m_vertexBuffer->Map(0, &readRange, &pVertexDataBegin), "vertex buffer map");
-		memcpy(pVertexDataBegin, box_data.data(), VERTEX_BUFFER_SIZE);
+		memcpy(pVertexDataBegin, stalk_data, VERTEX_BUFFER_SIZE);
+		//memcpy(pVertexDataBegin, box_data.data(), VERTEX_BUFFER_SIZE);
 		m_vertexBuffer->Unmap(0, nullptr);
 
 		m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
 		m_vertexBufferView.StrideInBytes = sizeof(vertex_t);
 		m_vertexBufferView.SizeInBytes = VERTEX_BUFFER_SIZE;
+
+		D3D12_HEAP_PROPERTIES heap_prop = {
+		  .Type = D3D12_HEAP_TYPE_UPLOAD,
+		  .CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
+		  .MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN,
+		  .CreationNodeMask = 1,
+		  .VisibleNodeMask = 1
+		};
+		D3D12_RESOURCE_DESC resource_desc = {
+		  .Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
+		  .Alignment = 0,
+		  .Width = INSTANCE_BUFFER_SIZE,
+		  .Height = 1,
+		  .DepthOrArraySize = 1,
+		  .MipLevels = 1,
+		  .Format = DXGI_FORMAT_UNKNOWN,
+		  .SampleDesc = {.Count = 1, .Quality = 0},
+		  .Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
+		  .Flags = D3D12_RESOURCE_FLAG_NONE
+		};
+		ThrowIfFailed(m_device->CreateCommittedResource(
+			&heap_prop,
+			D3D12_HEAP_FLAG_NONE,
+			&resource_desc,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(&instance_buffer)
+		), "create commited resource instance_buffer.");
+
+		UINT8* dst_data = nullptr;
+		D3D12_RANGE read_range = { 0, 0 };
+		instance_buffer->Map(
+			0, &read_range, reinterpret_cast<void**>(&dst_data));
+		memcpy(dst_data, stalk_instances.data(), INSTANCE_BUFFER_SIZE);
+		instance_buffer->Unmap(0, nullptr);
+
+		instance_buffer_view.BufferLocation =
+			instance_buffer->GetGPUVirtualAddress();
+		instance_buffer_view.SizeInBytes = INSTANCE_BUFFER_SIZE;
+		instance_buffer_view.StrideInBytes = sizeof(XMFLOAT4X4);
+
 
 		ThrowIfFailed(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)), "create fence");
 		m_fenceValue = 1;
@@ -708,25 +864,35 @@ namespace {
 		};
 		m_commandList[m_frameIndex]->ResourceBarrier(1, &pbarrier);
 
-		m_commandList[m_frameIndex]->OMSetRenderTargets(1, &m_rtvHandles[m_frameIndex], TRUE, &depthbufDescHandle);
+		m_commandList[m_frameIndex]->OMSetRenderTargets(1, &m_rtvHandles[m_frameIndex], FALSE, &depthbufDescHandle);
 
 		double time = get_time();
 
-		if (static_cast<int>(time) % 2 == 1) {
+		m_commandList[m_frameIndex]->ClearRenderTargetView(m_rtvHandles[m_frameIndex], black, 0, nullptr);
+
+		/*if (static_cast<int>(time) % 2 == 1) {
 			m_commandList[m_frameIndex]->ClearRenderTargetView(m_rtvHandles[m_frameIndex], blue, 0, nullptr);
 		}
 		else {
 			m_commandList[m_frameIndex]->ClearRenderTargetView(m_rtvHandles[m_frameIndex], yellow, 0, nullptr);
-		}
+		}*/
 		m_commandList[m_frameIndex]->ClearDepthStencilView(depthbufDescHandle,
-			D3D12_CLEAR_FLAG_STENCIL| D3D12_CLEAR_FLAG_DEPTH,
+			D3D12_CLEAR_FLAG_DEPTH,
 			1.0f,
 			0,
 			0,
 			nullptr);
 		m_commandList[m_frameIndex]->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-		m_commandList[m_frameIndex]->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		m_commandList[m_frameIndex]->DrawInstanced(NUM_VERTICES, 1, 0, 0);
+		//m_commandList[m_frameIndex]->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		m_commandList[m_frameIndex]->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINESTRIP);
+		m_commandList[m_frameIndex]->IASetVertexBuffers(
+			0, 1,
+			&m_vertexBufferView); // widok buf. wierzch. ze ŸdŸb³em
+		m_commandList[m_frameIndex]->IASetVertexBuffers(
+			1, 1, &instance_buffer_view);
+		m_commandList[m_frameIndex]->DrawInstanced(
+			NUM_VERTICES, NUM_INSTANCES, 0, 0);
+		//m_commandList[m_frameIndex]->DrawInstanced(NUM_VERTICES, 1, 0, 0);
 
 		barrier = {
 			.pResource = m_renderTargets[m_frameIndex].Get(),
@@ -769,13 +935,13 @@ void OnInit(HWND _hwnd) {
 }
 
 void OnUpdate(){
-	angle += 1.0f / 64.0f;
+	angle += 1.0f / 512.0f;
 	XMMATRIX world, view, proj;
 	world = XMMatrixMultiply(
 		XMMatrixRotationY(2.5f * angle),	// zmienna angle zmienia siê
 		// o 1 / 64 co ok. 15 ms 
-		XMMatrixRotationX(static_cast<FLOAT>(sin(angle)) / 2.0f));
-	view = XMMatrixTranslation(0.0f, 0.0f, 4.0f);
+		XMMatrixRotationX(static_cast<FLOAT>(sin(30.0f)) / 2.0f));
+	view = XMMatrixTranslation(0.0f, 0.0f, 3.0f);
 	proj = XMMatrixPerspectiveFovLH(
 			45.0f, m_viewport.Width / m_viewport.Height, 1.0f, 100.0f);
 
