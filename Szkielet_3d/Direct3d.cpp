@@ -7,11 +7,13 @@
 #include <numbers>
 #include <array>
 #include <random>
+#include <wincodec.h>
 
 #include "vertex_shader.h"
 #include "pixel_shader.h"
 #include "Throws.h"
 #include "Direct3d.h"
+#include "Texture.h"
 
 using Microsoft::WRL::ComPtr;
 using DirectX::XMFLOAT4X4;
@@ -201,7 +203,7 @@ namespace {
 
 	*/
 
-	struct vertex_t {
+	/*struct vertex_t {
 		FLOAT position[3];
 		FLOAT color[4];
 	};
@@ -236,7 +238,7 @@ namespace {
 							-1.0f / 16.0f, 3.0f / 16.0f)(gen),
 						uniform_real_distribution<FLOAT>(-1.0f, 1.0)(gen))));
 		}
-	}
+	}*/
 
 	ComPtr<ID3D12Resource> instance_buffer = nullptr;
 	D3D12_VERTEX_BUFFER_VIEW instance_buffer_view = {};
@@ -264,6 +266,8 @@ namespace {
 	ComPtr<ID3D12DescriptorHeap> depthbufDescHeap;
 	ComPtr<ID3D12Resource> depthbufResource;
 	D3D12_CPU_DESCRIPTOR_HANDLE depthbufDescHandle;
+
+	ComPtr<IWICImagingFactory> wic_factory;
 
 	UINT_PTR timer;
 
@@ -415,9 +419,11 @@ namespace {
 	}
 	
 	void LoadAssets() {
-		generate_stalks();
+		//generate_stalks();
 
-		D3D12_DESCRIPTOR_RANGE desc_range = {
+		RootSignature(m_device, m_rootSignature);
+
+		/*D3D12_DESCRIPTOR_RANGE desc_range = {
 			.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV,
 			.NumDescriptors = 1,
 			.BaseShaderRegister = 0,
@@ -446,7 +452,7 @@ namespace {
 		ComPtr<ID3DBlob> signature;
 		ComPtr<ID3DBlob> error;
 		ThrowIfFailed(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error), "serialize root signature");
-		ThrowIfFailed(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)), "create root signature");
+		ThrowIfFailed(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)), "create root signature");*/
 
 		/*D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
 			{
@@ -478,7 +484,7 @@ namespace {
 			}
 		};*/
 
-		D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
+		/*D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
 			{
 			.SemanticName = "POSITION",
 			.SemanticIndex = 0,
@@ -539,8 +545,9 @@ namespace {
 				D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA,
 			.InstanceDataStepRate = 1
 			}
-		};
+		};*/
 
+		auto inputElementDescs = GraphicPipelineState();
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {
 			.pRootSignature = m_rootSignature.Get(),
@@ -598,7 +605,7 @@ namespace {
 					.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS
 				},
 			},
-			.InputLayout = { inputElementDescs, _countof(inputElementDescs) },
+			.InputLayout = { inputElementDescs.data(), inputElementDescs.size()},
 			.IBStripCutValue = D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED,
 			.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
 			.NumRenderTargets = 1,
@@ -615,14 +622,15 @@ namespace {
 			ThrowIfFailed(m_commandList[n]->Close(), "close command list");
 		}
 		{
-			D3D12_DESCRIPTOR_HEAP_DESC heapDescConstBuf = {
+			ConstBuf(m_device, constbufDescHeap);
+			/*D3D12_DESCRIPTOR_HEAP_DESC heapDescConstBuf = {
 				.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
 				.NumDescriptors = 1,
 				.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
 				.NodeMask = 0,
 			};
 
-			ThrowIfFailed(m_device->CreateDescriptorHeap(&heapDescConstBuf, IID_PPV_ARGS(&constbufDescHeap)), "DescriptorHeapConstBuf");
+			ThrowIfFailed(m_device->CreateDescriptorHeap(&heapDescConstBuf, IID_PPV_ARGS(&constbufDescHeap)), "DescriptorHeapConstBuf"); */
 
 			D3D12_HEAP_PROPERTIES heapPropConstBuf = {
 				.Type = D3D12_HEAP_TYPE_UPLOAD,
@@ -773,7 +781,8 @@ namespace {
 		};        // We do not intend to read from this resource on the CPU.
 
 		ThrowIfFailed(m_vertexBuffer->Map(0, &readRange, &pVertexDataBegin), "vertex buffer map");
-		memcpy(pVertexDataBegin, stalk_data, VERTEX_BUFFER_SIZE);
+		memcpy(pVertexDataBegin, triangle_data, VERTEX_BUFFER_SIZE);
+		//memcpy(pVertexDataBegin, stalk_data, VERTEX_BUFFER_SIZE);
 		//memcpy(pVertexDataBegin, box_data.data(), VERTEX_BUFFER_SIZE);
 		m_vertexBuffer->Unmap(0, nullptr);
 
@@ -781,7 +790,7 @@ namespace {
 		m_vertexBufferView.StrideInBytes = sizeof(vertex_t);
 		m_vertexBufferView.SizeInBytes = VERTEX_BUFFER_SIZE;
 
-		D3D12_HEAP_PROPERTIES heap_prop = {
+		/*D3D12_HEAP_PROPERTIES heap_prop = {
 		  .Type = D3D12_HEAP_TYPE_UPLOAD,
 		  .CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
 		  .MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN,
@@ -819,7 +828,11 @@ namespace {
 		instance_buffer_view.BufferLocation =
 			instance_buffer->GetGPUVirtualAddress();
 		instance_buffer_view.SizeInBytes = INSTANCE_BUFFER_SIZE;
-		instance_buffer_view.StrideInBytes = sizeof(XMFLOAT4X4);
+		instance_buffer_view.StrideInBytes = sizeof(XMFLOAT4X4);*/
+
+		LoadBitmapFromFile(
+			TEXT("Obraz.jpg"), bmp_width, bmp_height, &bmp_bits, wic_factory);
+
 
 
 		ThrowIfFailed(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)), "create fence");
@@ -892,9 +905,9 @@ namespace {
 			&m_vertexBufferView); // widok buf. wierzch. ze ŸdŸb³em
 		m_commandList[m_frameIndex]->IASetVertexBuffers(
 			1, 1, &instance_buffer_view);
-		m_commandList[m_frameIndex]->DrawInstanced(
-			NUM_VERTICES, NUM_INSTANCES, 0, 0);
-		//m_commandList[m_frameIndex]->DrawInstanced(NUM_VERTICES, 1, 0, 0);
+		//m_commandList[m_frameIndex]->DrawInstanced(
+		//	NUM_VERTICES, NUM_INSTANCES, 0, 0);
+		m_commandList[m_frameIndex]->DrawInstanced(NUM_VERTICES, 1, 0, 0);
 
 		barrier = {
 			.pResource = m_renderTargets[m_frameIndex].Get(),

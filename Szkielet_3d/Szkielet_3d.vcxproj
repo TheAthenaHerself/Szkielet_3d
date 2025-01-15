@@ -134,11 +134,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Direct3d.cpp" />
+    <ClCompile Include="Texture.cpp" />
     <ClCompile Include="Throws.cpp" />
     <ClCompile Include="WinMain.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Direct3d.h" />
+    <ClInclude Include="Texture.h" />
     <ClInclude Include="Throws.h" />
   </ItemGroup>
   <ItemGroup>
