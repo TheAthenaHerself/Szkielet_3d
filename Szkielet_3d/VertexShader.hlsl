@@ -1,4 +1,4 @@
-cbuffer vs_const_buffer_t {
+/*cbuffer vs_const_buffer_t {
     float4x4 matWorldViewProj;
     float4 padding[12];
 };
@@ -17,7 +17,7 @@ vs_output_t main(
         float4(pos, 1.0f), mul(mat_w, matWorldViewProj));
     result.color = col;
     return result;
-}
+}*/
 
 
 /*cbuffer vs_const_buffer_t {
@@ -49,7 +49,7 @@ vs_output_t main(
     return result;
 }*/
 
-/*cbuffer vs_const_buffer_t
+cbuffer vs_const_buffer_t
 {
     float4x4 matWorldViewProj;
     float4 padding[12]; // zapewnia buforowi sta³emu rozmiar 
@@ -68,7 +68,7 @@ vs_output_t main(float3 pos : POSITION, float4 col : COLOR)
     result.position = mul(float4(pos, 1.0f), matWorldViewProj);
     result.color = col;
     return result;
-}*/
+}
 
 
 /*struct vs_output_t

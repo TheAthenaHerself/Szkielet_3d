@@ -100,7 +100,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <WarningLevel>EnableAllWarnings</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
@@ -115,7 +115,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <WarningLevel>EnableAllWarnings</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
@@ -133,15 +133,38 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="CommandQueue.cpp" />
+    <ClCompile Include="ConstantBuffer.cpp" />
+    <ClCompile Include="DepthBuffer.cpp" />
+    <ClCompile Include="DescriptorHeap.cpp" />
     <ClCompile Include="Direct3d.cpp" />
+    <ClCompile Include="GraphicsPipelineState.cpp" />
+    <ClCompile Include="RenderTargets.cpp" />
+    <ClCompile Include="rework.cpp" />
+    <ClCompile Include="RootSignature.cpp" />
+    <ClCompile Include="SwapChain.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="Throws.cpp" />
+    <ClCompile Include="VertexBuffer.cpp" />
     <ClCompile Include="WinMain.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Application3D.h" />
+    <ClInclude Include="BoxData.h" />
+    <ClInclude Include="CommandQueue.h" />
+    <ClInclude Include="ConstantBuffer.h" />
+    <ClInclude Include="DepthBuffer.h" />
+    <ClInclude Include="DescriptorHeap.h" />
     <ClInclude Include="Direct3d.h" />
+    <ClInclude Include="GraphicsPipelineState.h" />
+    <ClInclude Include="RenderTargets.h" />
+    <ClInclude Include="rework.h" />
+    <ClInclude Include="RootSignature.h" />
+    <ClInclude Include="SwapChain.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="Throws.h" />
+    <ClInclude Include="TriangleData.h" />
+    <ClInclude Include="VertexBuffer.h" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="PixelShader.hlsl">

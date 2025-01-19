@@ -3,12 +3,12 @@
 #include <array>
 #include <wrl.h>
 
-#include "Texture.h"
+#include "Application3D.h"
 #include "Throws.h"
 
 using Microsoft::WRL::ComPtr;
 
-HRESULT LoadBitmapFromFile(
+/*HRESULT LoadBitmapFromFile(
     PCWSTR uri, UINT& width, UINT& height, BYTE** ppBits, ComPtr<IWICImagingFactory> wic_factory) {
     HRESULT hr;
     ComPtr<IWICBitmapDecoder> pDecoder = nullptr;
@@ -272,4 +272,4 @@ void TexResource(ComPtr<ID3D12Device> m_device, ComPtr<ID3D12Resource> texture_r
         texture_resource.Get(), &srv_desc, cpu_desc_handle);
 
 
-}
+}*/

@@ -1,6 +1,6 @@
 #pragma once
 
-struct vertex_t {
+/*struct vertex_t {
     FLOAT position[3];
     FLOAT normal[3];
     FLOAT color[4];
@@ -72,4 +72,4 @@ HRESULT LoadBitmapFromFile(
 
 void RootSignature(ComPtr<ID3D12RootSignature> m_rootSignature, ComPtr<ID3D12Device> m_device);
 
-void ConstBuf(ComPtr<ID3D12Device> m_device, ComPtr<ID3D12DescriptorHeap> constbufDescHeap);
+void ConstBuf(ComPtr<ID3D12Device> m_device, ComPtr<ID3D12DescriptorHeap> constbufDescHeap);*/
