@@ -54,10 +54,15 @@ int WINAPI wWinMain(
     ShowWindow(hwnd, nCmdShow);
 
     MSG msg = { };
-    while (GetMessage(&msg, nullptr, 0, 0) > 0)
+    int a = 0;
+    while (a = GetMessage(&msg, nullptr, 0, 0) > 0)
     {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
+    }
+
+    if (a == -1) {
+        return 1;
     }
 
     return 0;
